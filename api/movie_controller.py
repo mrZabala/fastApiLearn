@@ -2,7 +2,7 @@ from core.utils import generate_id
 from models import CreateMovie, UpdateMovie, Movie
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/movies", tags=["Movies"])  # ← prefijo y tag
+router = APIRouter(prefix="/movies", tags=["Movies"])
 
 movies = [
     {"id": generate_id(), "title": "Inception", "director": "Christopher Nolan", "category": "Sci-Fi", "year": 2010},
@@ -13,7 +13,7 @@ movies = [
 def get_all_movies():
     return movies
 
-@router.get("/search")  # ← debe ir ANTES de /{id}
+@router.get("/search")
 def search_movie(query: str):
     return [
         movie for movie in movies

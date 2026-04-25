@@ -1,4 +1,3 @@
-# models/movies_models/movie_model.py
 from pydantic import BaseModel
 
 class Movie(BaseModel):
