@@ -98,7 +98,7 @@ This project will integrate MLB data from public APIs such as:
 This project is also part of a personal learning path:
 
 ```
-FastAPI → Django → Odoo
+FastAPI → Django
 ```
 
 Focus areas:
