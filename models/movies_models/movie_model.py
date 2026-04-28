@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from core.enums.status import StatusMovie
 
 class Movie(BaseModel):
     id: int
@@ -6,3 +7,4 @@ class Movie(BaseModel):
     director: str
     category: str
     year: int
+    status: StatusMovie
