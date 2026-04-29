@@ -1,112 +1,74 @@
 from core.utils import generate_id
-from models import CreateMovie, UpdateMovie, Movie
 from fastapi import APIRouter
-from fastapi import HTTPException
-from core.enums.status import StatusMovie
 from models.movies_models.MovieListResponse import MovieListResponse
 from models.movies_models.response_status import ResponseStatus
-from core.enums.status import StatusMovie
 from core.build_response import build_response
+from services.movie_services import (
+    get_all_movies_service, get_movie_detail_service, 
+    get_movies_with_limit_service, bulk_import_movies_service
+)
+from fastapi import Depends, Query
+from sqlalchemy.orm import Session
+from core.database import get_db
 
 router = APIRouter(prefix="/movies", tags=["Movies"])
 
-movies = [
-    {"id": generate_id(), "title": "Inception", "director": "Christopher Nolan", "category": "Sci-Fi", "year": 2010, "status": StatusMovie.CREATED},
-    {"id": generate_id(), "title": "The Matrix", "director": "Wachowski Sisters", "category": "Action", "year": 1999,  "status": StatusMovie.CREATED},
-]
+@router.get("/all", response_model=MovieListResponse)
+def get_all_movies(db: Session = Depends(get_db)):
+    """Obtener todas las películas de la BD"""
+    movies = get_all_movies_service(db)
 
-@router.get("/", response_model=MovieListResponse)
-def get_all_movies():
     if not movies:
         return build_response(
             status=ResponseStatus.EMPTY,
             data=[],
-            message="No hay películas registradas"
+            message="No hay películas guardadas"
         )
 
     return build_response(
         status=ResponseStatus.SUCCESS,
-        data=movies
+        data=movies,
+        message=f"Se encontraron {len(movies)} películas"
     )
 
 
-@router.get("/search", response_model=MovieListResponse)
-def search_movie(query: str):
-    result = [
-        movie for movie in movies
-        if query.lower() in movie["title"].lower()
-        or query.lower() in movie["director"].lower()
-    ]
+@router.get("/limited", response_model=MovieListResponse)
+def get_movies_limited(
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Obtener películas con límite (máx 100)"""
+    movies = get_movies_with_limit_service(db, limit)
 
-    if not result:
+    if not movies:
         return build_response(
             status=ResponseStatus.EMPTY,
             data=[],
-            message="No results found"
+            message="No hay películas disponibles"
         )
 
     return build_response(
         status=ResponseStatus.SUCCESS,
-        data=result
+        data=movies,
+        message=f"Se encontraron {len(movies)} películas"
     )
 
 
-@router.get("/{id}", response_model=MovieListResponse)
-def get_movie_by_id(id: int):
-    for movie in movies:
-        if movie["id"] == id:
-            return build_response(
-                status=ResponseStatus.SUCCESS,
-                data=[movie]
-            )
-
-    raise HTTPException(status_code=404, detail="Movie not found")
-
-
-@router.post("/", response_model=MovieListResponse)
-def create_movie(new_movie: CreateMovie):
-    movie = new_movie.model_dump()
-    movie["id"] = generate_id()
-    movie["status"] = StatusMovie.CREATED
-    movies.append(movie)
-
+@router.post("/import", response_model=dict)
+async def bulk_import_movies(
+    query: str = Query(..., description="Término de búsqueda en OMDb"),
+    count: int = Query(100, ge=1, le=100, description="Cantidad de películas a importar (máx 100)"),
+    db: Session = Depends(get_db)
+):
+    """
+    ✨ Importar hasta 100 películas de OMDb en una sola operación
+    
+    Ejemplo: /movies/import?query=marvel&count=100
+    """
+    result = await bulk_import_movies_service(db, query, count)
+    
     return build_response(
-        status=ResponseStatus.SUCCESS,
-        data=[movie],
-        message="Movie created"
+        status=ResponseStatus.SUCCESS if result["imported"] > 0 else ResponseStatus.EMPTY,
+        data=result,
+        message=result.get("message", "")
     )
-
-
-# ✅ UPDATE
-@router.put("/{id}", response_model=MovieListResponse)
-def update_movie(id: int, updated_movie: UpdateMovie):
-    for movie in movies:
-        if movie["id"] == id:
-            update_data = updated_movie.model_dump(exclude_unset=True)
-            movie.update(update_data)
-            movie["status"] = StatusMovie.UPDATED
-
-            return build_response(
-                status=ResponseStatus.SUCCESS,
-                data=[movie],
-                message="Movie updated"
-            )
-
-    raise HTTPException(status_code=404, detail="Movie not found")
-
-
-# ✅ DELETE
-@router.delete("/{id}", response_model=MovieListResponse)
-def delete_movie(id: int):
-    for movie in movies:
-        if movie["id"] == id:
-            movies.remove(movie)
-            movie["status"] = StatusMovie.DELETED
-
-            return build_response(
-                status=ResponseStatus.SUCCESS,
-                data=[movie],
-                message="Movie deleted"
-            )
-
-    raise HTTPException(status_code=404, detail="Movie not found")

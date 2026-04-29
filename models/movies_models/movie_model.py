@@ -1,10 +1,17 @@
 from pydantic import BaseModel
 from core.enums.status import StatusMovie
+from typing import Optional
 
 class Movie(BaseModel):
     id: int
     title: str
-    director: str
-    category: str
-    year: int
-    status: StatusMovie
+    director: Optional[str] = None
+    category: Optional[str] = None
+    year: Optional[int] = None
+    status: str
+    imdb_id: Optional[str] = None
+    poster: Optional[str] = None
+    plot: Optional[str] = None
+
+    class Config:
+        from_attributes = True

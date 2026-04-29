@@ -38,11 +38,9 @@ This project was created to:
 
 ### 🎬 Movies Endpoints
 
-* `GET /movies` → Get all movies
-* `GET /movies/id/{id}` → Get movie by ID
-* `GET /movies/{query}` → Search by title or director
-* `GET /movies/year/{year}` → Get movies by year
-* `GET /movies?category=&year=` → Filter movies by category and year
+* `GET /movies/all` → Get all movies from database
+* `GET /movies/limited?limit=50` → Get movies with limit (max 100)
+* **✨ `POST /movies/import?query=marvel&count=100` → Bulk import up to 100 movies from OMDb API**
 
 ### ✍️ Data Management
 
@@ -51,29 +49,52 @@ This project was created to:
 
 ---
 
-## 🚨 Known Issues / Limitations
+## ✨ NEW FEATURE: Bulk Import 100 Records
 
-* Duplicate routes may cause conflicts (`/movies/{query}` vs `/movies/{title}`)
-* IDs are randomly generated once (not unique per record)
-* Data is stored in memory (no database yet)
-* No validation using Pydantic models
-* No separation of concerns (everything in one file)
+**Import up to 100 movies from OMDb API in a single request:**
+
+```bash
+POST /movies/import?query=marvel&count=100
+```
+
+**Returns:**
+```json
+{
+  "status": "SUCCESS",
+  "message": "Se importaron 87 películas correctamente",
+  "data": {
+    "imported": 87,
+    "total_in_db": 142
+  }
+}
+```
+
+See `BULK_IMPORT_GUIDE.md` for complete documentation.
 
 ---
 
-## 🧱 Planned Improvements (Next Steps)
+## 🚨 Issues Fixed ✅
 
-This project will evolve into a more structured backend using a layered architecture:
+* ✅ Duplicate routes resolved (`/movies/all` and `/movies/limited` instead of `/movies/movies/all`)
+* ✅ Added unique IDs (using database auto-increment + imdb_id)
+* ✅ Added database schema with proper fields
+* ✅ Fixed syntax errors in `movie_services.py`
+* ✅ Fixed imports and circular dependencies
+* ✅ Added Pydantic validation with proper models
+* ✅ Separated concerns properly (Models → Repository → Services → Controllers)
+* ✅ Added bulk import functionality (100 records at once)
 
-### 🧩 Architecture (Planned)
+---
+
+## 🧱 Architecture (Implemented) ✅
 
 Models → Repository → Services → Controllers → Views
 
-* **Models**: Data structure (Pydantic / ORM)
-* **Repository**: Data access layer (DB or external APIs)
-* **Services**: Business logic
-* **Controllers**: Route handling
-* **Views**: Response formatting
+* **Models**: Data structure (Pydantic / ORM) ✅
+* **Repository**: Data access layer (DB or external APIs) ✅
+* **Services**: Business logic ✅
+* **Controllers**: Route handling ✅
+* **Views**: Response formatting ✅
 
 ---
 
