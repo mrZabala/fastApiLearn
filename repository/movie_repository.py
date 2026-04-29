@@ -1,10 +1,7 @@
 import httpx
 from sqlalchemy.orm import Session
+from core.config import GENERIC_QUERIES, OMDB_API_KEY, OMDB_API_URL
 from models.db.movie_entity import MovieEntity
-
-OMDB_API_URL = "https://www.omdbapi.com/"
-OMDB_API_KEY = "8a90e22f"
-
 
 def get_all_movies(db: Session):
     return db.query(MovieEntity).all()
@@ -99,16 +96,18 @@ def save_movie(db: Session, movie_data: dict):
 
 
 def bulk_save_movies(db: Session, movies_list: list):
-    """Guardar múltiples películas a la vez"""
+    """Guardar múltiples películas, ignorando duplicados"""
     count = 0
     for movie_data in movies_list:
         try:
             movie = MovieEntity(**movie_data)
             db.add(movie)
+            db.flush()  
             count += 1
         except Exception:
+            db.rollback() 
             continue
-    
+
     db.commit()
     return count
 
@@ -116,3 +115,70 @@ def bulk_save_movies(db: Session, movies_list: list):
 def get_movie_count(db: Session):
     """Obtener cantidad total de películas en BD"""
     return db.query(MovieEntity).count()
+
+async def search_movies_omdb_paginated(query: str, max_results: int = 100):
+    """Busca películas en múltiples páginas hasta alcanzar max_results"""
+    all_movies = []
+    page = 1
+    
+    async with httpx.AsyncClient() as client:
+        while len(all_movies) < max_results:
+            response = await client.get(
+                OMDB_API_URL,
+                params={
+                    "apikey": OMDB_API_KEY,
+                    "s": query,
+                    "page": page
+                }
+            )
+            data = response.json()
+            
+            if data.get("Response") == "False":
+                break
+            
+            results = data.get("Search", [])
+            if not results:
+                break
+            
+            all_movies.extend(results)
+            
+            # OMDb indica cuántos resultados totales hay
+            total_results = int(data.get("totalResults", 0))
+            if len(all_movies) >= total_results:
+                break
+            
+            page += 1
+    
+    return all_movies[:max_results]
+
+async def search_movies_omdb_any(max_results: int = 100):
+    all_movies = {}
+
+    async with httpx.AsyncClient() as client:
+        for query in GENERIC_QUERIES:
+            if len(all_movies) >= max_results:
+                break
+
+            page = 1
+            while len(all_movies) < max_results:  # ← ahora pagina cada query
+                response = await client.get(
+                    OMDB_API_URL,
+                    params={"apikey": OMDB_API_KEY, "s": query, "page": page}
+                )
+                data = response.json()
+
+                if data.get("Response") == "False":
+                    break
+
+                for item in data.get("Search", []):
+                    imdb_id = item.get("imdbID")
+                    if imdb_id and imdb_id not in all_movies:
+                        all_movies[imdb_id] = item
+
+                total_results = int(data.get("totalResults", 0))
+                if len(all_movies) >= total_results or page * 10 >= total_results:
+                    break
+
+                page += 1
+
+    return list(all_movies.values())[:max_results]

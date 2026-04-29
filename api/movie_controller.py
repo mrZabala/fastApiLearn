@@ -3,10 +3,7 @@ from fastapi import APIRouter
 from models.movies_models.MovieListResponse import MovieListResponse
 from models.movies_models.response_status import ResponseStatus
 from core.build_response import build_response
-from services.movie_services import (
-    get_all_movies_service, get_movie_detail_service, 
-    get_movies_with_limit_service, bulk_import_movies_service
-)
+from services.movie_services import (get_all_movies_service, get_movie_detail_service, get_movies_with_limit_service, bulk_import_movies_service)
 from fastapi import Depends, Query
 from sqlalchemy.orm import Session
 from core.database import get_db
@@ -15,7 +12,6 @@ router = APIRouter(prefix="/movies", tags=["Movies"])
 
 @router.get("/all", response_model=MovieListResponse)
 def get_all_movies(db: Session = Depends(get_db)):
-    """Obtener todas las películas de la BD"""
     movies = get_all_movies_service(db)
 
     if not movies:
@@ -37,7 +33,6 @@ def get_movies_limited(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Obtener películas con límite (máx 100)"""
     movies = get_movies_with_limit_service(db, limit)
 
     if not movies:
@@ -56,15 +51,11 @@ def get_movies_limited(
 
 @router.post("/import", response_model=MovieListResponse)
 async def bulk_import_movies(
-    query: str = Query(..., description="Término de búsqueda en OMDb"),
-    count: int = Query(100, ge=1, le=100, description="Cantidad de películas a importar (máx 100)"),
+    query: str = Query(None, description="Término de búsqueda (opcional)"),  
+    count: int = Query(100, ge=1),
     db: Session = Depends(get_db)
 ):
-    """
-    ✨ Importar hasta 100 películas de OMDb en una sola operación
-    
-    Ejemplo: /movies/import?query=marvel&count=100
-    """
+
     result = await bulk_import_movies_service(db, query, count)
     
     return build_response(
