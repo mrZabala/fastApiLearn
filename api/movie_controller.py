@@ -54,7 +54,7 @@ def get_movies_limited(
     )
 
 
-@router.post("/import", response_model=dict)
+@router.post("/import", response_model=MovieListResponse)
 async def bulk_import_movies(
     query: str = Query(..., description="Término de búsqueda en OMDb"),
     count: int = Query(100, ge=1, le=100, description="Cantidad de películas a importar (máx 100)"),
