@@ -1,14 +1,22 @@
 from repository.movie_repository import (
     create_movie, get_all_movies, get_movie_by_imdb_id, search_movies_omdb_any,
-    get_movie_by_title, get_movies_with_limit, search_movies_omdb,
-    save_movie, get_movie_detail_omdb, bulk_save_movies,
-    get_movie_count, search_movies_omdb_paginated, search_movies_omdb_any  
+    get_movie_by_title, get_movies_with_limit, search_movies_omdb, get_movie_detail_omdb, bulk_save_movies,
+    get_movie_count, search_movies_omdb_paginated, search_movies_omdb_any, get_movie_by_filter
 )
 from core.enums.status import StatusMovie
 from services.mappers.movie_mapper import map_movie
 from core.enums.status import StatusMovie
 from services.mappers.movie_mapper import map_movie
 
+
+async def create_movie_service(db, movie_data: dict):
+    existing_movie = get_movie_by_title(db, movie_data.get("title"))
+    if existing_movie:
+        return map_movie(existing_movie)
+
+    saved_movie = create_movie(db, movie_data)
+    return map_movie(saved_movie)
+    
 
 async def search_movies_service(query: str):
     data = await search_movies_omdb(query)
@@ -53,16 +61,17 @@ def get_all_movies_service(db):
     data = get_all_movies(db)
     return [map_movie(m) for m in data] if data else []
 
+def get_movie_by_filter_service(db, year=None, category=None, director=None):
+    movies = get_movie_by_filter(db, year=year, category=category, director=director)
+    return [map_movie(m) for m in movies]
+
 def get_movies_with_limit_service(db, limit: int):
     data = get_movies_with_limit(db, min(limit, 100))
     return [map_movie(m) for m in data] if data else []
 
-
 async def bulk_import_movies_service(db, query: str = None, count: int = 100):
-    """Importar películas — con query o sin criterio"""
     count = min(count, 100)
 
-    # Con query usa paginación, sin query usa términos genéricos
     if query:
         search_results = await search_movies_omdb_paginated(query, max_results=count)
     else:
@@ -98,7 +107,6 @@ async def bulk_import_movies_service(db, query: str = None, count: int = 100):
     }
 
 def parse_year(year_str):
-    """Convierte '2019', '2019–', '2019-2021' a int de forma segura"""
     if not year_str:
         return None
     try:

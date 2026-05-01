@@ -1,9 +1,5 @@
-def map_movie(movie):
-    return {
-        "id": movie.id,
-        "title": movie.title,
-        "director": movie.director,
-        "category": movie.category,
-        "year": movie.year,
-        "status": movie.status
-    }
+from models.movies_models.movie_model import Movie
+from models.db.movie_entity import MovieEntity
+
+def map_movie(entity: MovieEntity) -> Movie:
+    return Movie.model_validate(entity)

@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from core.enums.status import StatusMovie
 from typing import Optional
 
 class Movie(BaseModel):
@@ -13,5 +12,4 @@ class Movie(BaseModel):
     poster: Optional[str] = None
     plot: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}  

@@ -6,6 +6,20 @@ from models.db.movie_entity import MovieEntity
 def get_all_movies(db: Session):
     return db.query(MovieEntity).all()
 
+def get_movie_by_filter(db: Session, year: int | None = None, category: str | None = None, director: str | None = None):
+    all_movies = db.query(MovieEntity).all()
+    print(f"Total en DB: {len(all_movies)}")
+    for m in all_movies:
+        print(f"  year={m.year}, category='{m.category}'")
+    
+    query = db.query(MovieEntity)
+    if year:
+        query = query.filter(MovieEntity.year == year)
+    if category:
+        query = query.filter(MovieEntity.category == category)
+    if director:
+        query = query.filter(MovieEntity.director == director)
+    return query.all()
 
 def create_movie(db: Session, movie_data: dict):
     movie = MovieEntity(**movie_data)
@@ -13,7 +27,6 @@ def create_movie(db: Session, movie_data: dict):
     db.commit()
     db.refresh(movie)
     return movie
-
 
 def get_movie_by_id(db: Session, movie_id: int):
     return db.query(MovieEntity).filter(MovieEntity.id == movie_id).first()
@@ -96,21 +109,19 @@ def save_movie(db: Session, movie_data: dict):
 
 
 def bulk_save_movies(db: Session, movies_list: list):
-    """Guardar múltiples películas, ignorando duplicados"""
     count = 0
     for movie_data in movies_list:
         try:
+            db.begin_nested()  # savepoint — rollback solo afecta este registro
             movie = MovieEntity(**movie_data)
             db.add(movie)
-            db.flush()  
+            db.flush()
             count += 1
         except Exception:
-            db.rollback() 
+            db.rollback()
             continue
-
     db.commit()
     return count
-
 
 def get_movie_count(db: Session):
     """Obtener cantidad total de películas en BD"""
