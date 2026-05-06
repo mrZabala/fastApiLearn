@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from datetime import datetime
 from core.database import Base
 
 class MovieEntity(Base):
@@ -12,3 +13,5 @@ class MovieEntity(Base):
     imdb_id = Column(String, unique=True, nullable=True, index=True)
     poster = Column(String, nullable=True)
     plot = Column(String, nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)

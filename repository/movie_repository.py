@@ -1,18 +1,41 @@
+# repository/movie_repository.py
+
+from datetime import datetime
 import httpx
 from sqlalchemy.orm import Session
 from core.config import GENERIC_QUERIES, OMDB_API_KEY, OMDB_API_URL
 from models.db.movie_entity import MovieEntity
 
-def get_all_movies(db: Session):
-    return db.query(MovieEntity).all()
 
-def get_movie_by_filter(db: Session, year: int | None = None, category: str | None = None, director: str | None = None):
-    all_movies = db.query(MovieEntity).all()
-    print(f"Total en DB: {len(all_movies)}")
-    for m in all_movies:
-        print(f"  year={m.year}, category='{m.category}'")
-    
-    query = db.query(MovieEntity)
+def get_all_movies(db: Session):
+    return db.query(MovieEntity).filter(MovieEntity.is_deleted == False).all()
+
+def get_movie_by_id(db: Session, movie_id: int):
+    return db.query(MovieEntity).filter(
+        MovieEntity.id == movie_id,
+        MovieEntity.is_deleted == False
+    ).first()
+
+def get_movie_by_title(db: Session, title: str):
+    return db.query(MovieEntity).filter(
+        MovieEntity.title == title,
+        MovieEntity.is_deleted == False
+    ).first()
+
+def get_movie_by_director(db: Session, director: str):
+    return db.query(MovieEntity).filter(
+        MovieEntity.director == director,
+        MovieEntity.is_deleted == False
+    ).all()
+
+def get_movie_by_imdb_id(db: Session, imdb_id: str):
+    return db.query(MovieEntity).filter(
+        MovieEntity.imdb_id == imdb_id,
+        MovieEntity.is_deleted == False
+    ).first()
+
+def get_movie_by_filter(db: Session, year=None, category=None, director=None):
+    query = db.query(MovieEntity).filter(MovieEntity.is_deleted == False)
     if year:
         query = query.filter(MovieEntity.year == year)
     if category:
@@ -21,6 +44,14 @@ def get_movie_by_filter(db: Session, year: int | None = None, category: str | No
         query = query.filter(MovieEntity.director == director)
     return query.all()
 
+def get_movies_with_limit(db: Session, limit: int):
+    return db.query(MovieEntity).filter(
+        MovieEntity.is_deleted == False
+    ).limit(limit).all()
+
+def get_movie_count(db: Session):
+    return db.query(MovieEntity).filter(MovieEntity.is_deleted == False).count()
+
 def create_movie(db: Session, movie_data: dict):
     movie = MovieEntity(**movie_data)
     db.add(movie)
@@ -28,91 +59,31 @@ def create_movie(db: Session, movie_data: dict):
     db.refresh(movie)
     return movie
 
-def get_movie_by_id(db: Session, movie_id: int):
-    return db.query(MovieEntity).filter(MovieEntity.id == movie_id).first()
-
-
 def update_movie(db: Session, movie_id: int, update_data: dict):
     movie = get_movie_by_id(db, movie_id)
     if not movie:
         return None
-
     for key, value in update_data.items():
         setattr(movie, key, value)
-
     db.commit()
     db.refresh(movie)
     return movie
-
 
 def delete_movie(db: Session, movie_id: int):
     movie = get_movie_by_id(db, movie_id)
     if not movie:
         return None
-
-    db.delete(movie)
-    db.commit()
-    return movie
-
-
-async def search_movies_omdb(query: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            OMDB_API_URL,
-            params={
-                "apikey": OMDB_API_KEY,
-                "s": query
-            }
-        )
-        return response.json()
-
-
-async def get_movie_detail_omdb(title: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            OMDB_API_URL,
-            params={
-                "apikey": OMDB_API_KEY,
-                "t": title
-            }
-        )
-        return response.json()
-
-
-def get_movie_by_title(db: Session, title: str):
-    return db.query(MovieEntity).filter(MovieEntity.title == title).first()
-
-
-def get_movie_by_imdb_id(db: Session, imdb_id: str):
-    return db.query(MovieEntity).filter(MovieEntity.imdb_id == imdb_id).first()
-
-
-def get_movies_with_limit(db: Session, limit: int):
-    return db.query(MovieEntity).limit(limit).all()
-
-
-def save_movie(db: Session, movie_data: dict):
-    movie = MovieEntity(
-        title=movie_data.get("title"),
-        year=movie_data.get("year"),
-        imdb_id=movie_data.get("imdb_id"),
-        category=movie_data.get("category"),
-        poster=movie_data.get("poster"),
-        director=movie_data.get("director"),
-        plot=movie_data.get("plot")
-    )
-
-    db.add(movie)
+    movie.is_deleted = True
+    movie.deleted_at = datetime.utcnow()
     db.commit()
     db.refresh(movie)
     return movie
-
 
 def bulk_save_movies(db: Session, movies_list: list):
     count = 0
     for movie_data in movies_list:
         try:
-            db.begin_nested()  # savepoint — rollback solo afecta este registro
+            db.begin_nested()
             movie = MovieEntity(**movie_data)
             db.add(movie)
             db.flush()
@@ -123,73 +94,66 @@ def bulk_save_movies(db: Session, movies_list: list):
     db.commit()
     return count
 
-def get_movie_count(db: Session):
-    """Obtener cantidad total de películas en BD"""
-    return db.query(MovieEntity).count()
+
+async def search_movies_omdb(query: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            OMDB_API_URL,
+            params={"apikey": OMDB_API_KEY, "s": query}
+        )
+        return response.json()
+
+async def get_movie_detail_omdb(title: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            OMDB_API_URL,
+            params={"apikey": OMDB_API_KEY, "t": title}
+        )
+        return response.json()
 
 async def search_movies_omdb_paginated(query: str, max_results: int = 100):
-    """Busca películas en múltiples páginas hasta alcanzar max_results"""
     all_movies = []
     page = 1
-    
     async with httpx.AsyncClient() as client:
         while len(all_movies) < max_results:
             response = await client.get(
                 OMDB_API_URL,
-                params={
-                    "apikey": OMDB_API_KEY,
-                    "s": query,
-                    "page": page
-                }
+                params={"apikey": OMDB_API_KEY, "s": query, "page": page}
             )
             data = response.json()
-            
             if data.get("Response") == "False":
                 break
-            
             results = data.get("Search", [])
             if not results:
                 break
-            
             all_movies.extend(results)
-            
-            # OMDb indica cuántos resultados totales hay
             total_results = int(data.get("totalResults", 0))
             if len(all_movies) >= total_results:
                 break
-            
             page += 1
-    
     return all_movies[:max_results]
 
 async def search_movies_omdb_any(max_results: int = 100):
     all_movies = {}
-
     async with httpx.AsyncClient() as client:
         for query in GENERIC_QUERIES:
             if len(all_movies) >= max_results:
                 break
-
             page = 1
-            while len(all_movies) < max_results:  # ← ahora pagina cada query
+            while len(all_movies) < max_results:
                 response = await client.get(
                     OMDB_API_URL,
                     params={"apikey": OMDB_API_KEY, "s": query, "page": page}
                 )
                 data = response.json()
-
                 if data.get("Response") == "False":
                     break
-
                 for item in data.get("Search", []):
                     imdb_id = item.get("imdbID")
                     if imdb_id and imdb_id not in all_movies:
                         all_movies[imdb_id] = item
-
                 total_results = int(data.get("totalResults", 0))
                 if len(all_movies) >= total_results or page * 10 >= total_results:
                     break
-
                 page += 1
-
     return list(all_movies.values())[:max_results]

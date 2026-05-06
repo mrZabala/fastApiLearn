@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class Movie(BaseModel):
     id: int
@@ -11,5 +12,6 @@ class Movie(BaseModel):
     imdb_id: Optional[str] = None
     poster: Optional[str] = None
     plot: Optional[str] = None
-
-    model_config = {"from_attributes": True}  
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}

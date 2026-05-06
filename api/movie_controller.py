@@ -13,16 +13,13 @@ from services.movie_services import (
     get_movies_with_limit_service,
     bulk_import_movies_service,
     create_movie_service,
+    get_movie_by_director_service
 )
 from repository.movie_repository import update_movie, delete_movie, get_movie_by_id
 from services.mappers.movie_mapper import map_movie
 
 router = APIRouter(prefix="/movies", tags=["Movies"])
 
-
-# =========================
-# 🎬 GET - LISTADOS
-# =========================
 
 @router.get("/all", response_model=MovieListResponse)
 def get_all_movies(db: Session = Depends(get_db)):
@@ -48,6 +45,17 @@ def get_movies_by_filter(
         message=f"Se encontraron {len(movies)} películas"
     )
 
+@router.get("/director", response_model=MovieListResponse)
+def get_movie_by_director(
+    director: str,
+    db: Session = Depends(get_db)         
+):
+    directors = get_movie_by_director_service(db, director)
+    return build_response(
+        status=ResponseStatus.SUCCESS if directors else ResponseStatus.EMPTY,
+        data=directors or [],
+        message=f"Se encontraron {len(directors)} directores"
+    )
 
 @router.get("/limited", response_model=MovieListResponse)
 def get_movies_limited(
@@ -62,7 +70,6 @@ def get_movies_limited(
     )
 
 
-# 🔥 PAGINACIÓN PRO (IMPORTANTE PARA PORTFOLIO)
 @router.get("/paginated", response_model=MovieListResponse)
 def get_movies_paginated(
     limit: int = Query(20, ge=1, le=500),
@@ -76,11 +83,6 @@ def get_movies_paginated(
         data=[map_movie(m) for m in movies],
         message=f"Se encontraron {len(movies)} películas (offset={offset})"
     )
-
-
-# =========================
-# 🎬 POST
-# =========================
 
 @router.post("/", response_model=MovieListResponse)
 async def create_movie(movie: CreateMovie, db: Session = Depends(get_db)):
@@ -105,11 +107,6 @@ async def bulk_import_movies(
         message=result.get("message", "")
     )
 
-
-# =========================
-# 🛠 DEBUG (OPCIONAL)
-# =========================
-
 @router.get("/debug/count")
 def debug_count(db: Session = Depends(get_db)):
     from sqlalchemy import text
@@ -117,11 +114,6 @@ def debug_count(db: Session = Depends(get_db)):
         "orm_count": db.query(MovieEntity).count(),
         "raw_sql_count": db.execute(text("SELECT COUNT(*) FROM movie")).scalar()
     }
-
-
-# =========================
-# 🎬 GET BY ID (AL FINAL 🔥)
-# =========================
 
 @router.get("/id/{movie_id}", response_model=MovieListResponse)
 def get_movie(movie_id: int, db: Session = Depends(get_db)):
@@ -132,11 +124,6 @@ def get_movie(movie_id: int, db: Session = Depends(get_db)):
         message="OK" if movie else "Película no encontrada"
     )
 
-
-# =========================
-# ✏️ UPDATE
-# =========================
-
 @router.put("/id/{movie_id}", response_model=MovieListResponse)
 def update_movie_endpoint(movie_id: int, movie: UpdateMovie, db: Session = Depends(get_db)):
     updated = update_movie(db, movie_id, movie.to_update_dict())
@@ -145,11 +132,6 @@ def update_movie_endpoint(movie_id: int, movie: UpdateMovie, db: Session = Depen
         data=map_movie(updated) if updated else [],
         message="Película actualizada" if updated else "Película no encontrada"
     )
-
-
-# =========================
-# 🗑 DELETE
-# =========================
 
 @router.delete("/id/{movie_id}", response_model=MovieListResponse)
 def delete_movie_endpoint(movie_id: int, db: Session = Depends(get_db)):

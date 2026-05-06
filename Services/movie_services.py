@@ -1,10 +1,11 @@
+from sqlalchemy.orm import Session  
 from repository.movie_repository import (
-    create_movie, get_all_movies, get_movie_by_imdb_id, search_movies_omdb_any,
-    get_movie_by_title, get_movies_with_limit, search_movies_omdb, get_movie_detail_omdb, bulk_save_movies,
-    get_movie_count, search_movies_omdb_paginated, search_movies_omdb_any, get_movie_by_filter
+    create_movie, get_all_movies, get_movie_by_imdb_id,
+    get_movie_by_title, get_movies_with_limit, search_movies_omdb,
+    get_movie_detail_omdb, bulk_save_movies, get_movie_count,
+    search_movies_omdb_paginated, search_movies_omdb_any,
+    get_movie_by_filter, get_movie_by_director
 )
-from core.enums.status import StatusMovie
-from services.mappers.movie_mapper import map_movie
 from core.enums.status import StatusMovie
 from services.mappers.movie_mapper import map_movie
 
@@ -13,16 +14,14 @@ async def create_movie_service(db, movie_data: dict):
     existing_movie = get_movie_by_title(db, movie_data.get("title"))
     if existing_movie:
         return map_movie(existing_movie)
-
     saved_movie = create_movie(db, movie_data)
     return map_movie(saved_movie)
-    
+
 
 async def search_movies_service(query: str):
     data = await search_movies_omdb(query)
     if data.get("Response") == "False":
         return []
-
     return [
         {
             "title": item.get("Title"),
@@ -36,15 +35,14 @@ async def search_movies_service(query: str):
         for item in data.get("Search", [])
     ]
 
+
 async def get_movie_detail_service(title: str, db):
     data = await get_movie_detail_omdb(title)
     if data.get("Response") == "False":
         return None
-
     existing_movie = get_movie_by_title(db, data.get("Title"))
     if existing_movie:
         return map_movie(existing_movie)
-
     saved_movie = create_movie(db, {
         "title": data.get("Title"),
         "director": data.get("Director"),
@@ -57,21 +55,29 @@ async def get_movie_detail_service(title: str, db):
     })
     return map_movie(saved_movie)
 
+
 def get_all_movies_service(db):
     data = get_all_movies(db)
     return [map_movie(m) for m in data] if data else []
+
 
 def get_movie_by_filter_service(db, year=None, category=None, director=None):
     movies = get_movie_by_filter(db, year=year, category=category, director=director)
     return [map_movie(m) for m in movies]
 
+
+def get_movie_by_director_service(db, director: str):
+    data = get_movie_by_director(db, director)
+    return [map_movie(m) for m in data] if data else []
+
+
 def get_movies_with_limit_service(db, limit: int):
     data = get_movies_with_limit(db, min(limit, 100))
     return [map_movie(m) for m in data] if data else []
 
+
 async def bulk_import_movies_service(db, query: str = None, count: int = 100):
     count = min(count, 100)
-
     if query:
         search_results = await search_movies_omdb_paginated(query, max_results=count)
     else:
@@ -92,19 +98,19 @@ async def bulk_import_movies_service(db, query: str = None, count: int = 100):
             "status": StatusMovie.CREATED.value
         }
         for item in search_results
-        if not get_movie_by_imdb_id(db, item.get("imdbID"))  # solo las que no existen
+        if not get_movie_by_imdb_id(db, item.get("imdbID"))
     ]
 
     if not movies_to_import:
         return {"imported": 0, "message": "Todas las películas ya existen en la BD"}
 
     saved_count = bulk_save_movies(db, movies_to_import)
-
     return {
         "imported": saved_count,
         "message": f"Se importaron {saved_count} películas correctamente",
         "total_in_db": get_movie_count(db)
     }
+
 
 def parse_year(year_str):
     if not year_str:
